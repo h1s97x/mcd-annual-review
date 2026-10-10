@@ -1,0 +1,12 @@
+# 个人真实数据，勿提交
+orders.json
+raw_dump.json
+*.token
+
+# Python
+__pycache__/
+*.pyc
+
+# 本地临时产物（截图 / 探测 / 调试）
+.tmp/
+report.test.html

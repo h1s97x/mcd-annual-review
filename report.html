@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="color-scheme" content="dark light"/>
+<meta name="description" content="麦门年度账本 · McWrapped —— 基于麦当劳 MCP 历史订单的个人年度报告"/>
+<meta name="generator" content="mcd-order-report · deck v1.0.0"/>
+<title>麦门年度账本 · McWrapped</title>
+<style>/* =========================================================================
+   deck.css · McWrapped 动效层（P5R 波普朋克视觉）
+   零外部依赖：无 @import、无外链字体、无远程图片。
+   所有颜色走 CSS 变量，由 :root 注入，随主题切换实时生效。
+
+   DOM 契约（与数据层唯一接口，动效层不认识任何业务概念）：
+     data-scene        场景 key
+     data-chapter      章节序号      data-chapter-name 章节名
+     data-particles=n  粒子数量      data-decor=kind   角落插画类型
+     data-count        数字滚动目标  data-prefix/suffix/decimals/group/count-dur
+     data-anim         fade | draw | grow | scale | slide | slash
+     data-anim-delay   ms（配合 --delay）
+     data-beat         演出节拍序号（逐步展示用，0 起）
+   ========================================================================= */
+
+:root{
+  --bg:#0A0A0A;--bg-2:#141414;--panel:#171717;--panel-2:#1F1F1F;--text:#F5F1EA;--muted:#A8A29A;--faint:#6B655D;--accent:#E60012;--accent-2:#FF2A2A;--accent-ink:#0A0A0A;--brand:#E60012;--gold:#FFB300;--grid:rgba(230,0,18,.10);--border:rgba(245,241,234,.14);--slash:#E60012;--slash-2:#1F1F1F;--tape:rgba(245,241,234,.06);--glow:rgba(230,0,18,.30);--particle:#E60012;--grain-op:.05;
+  --dur: .7s;
+  --slab: 7deg;          /* P5R 斜切角度 */
+  --ink: #0A0A0A;
+}
+
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",
+    "Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+  overflow:hidden;
+  font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ============================================================ 舞台 / 轨道 */
+.stage{position:fixed;inset:0;overflow:hidden;background:var(--bg);}
+.track{
+  position:absolute;inset:0;
+  transition:transform .82s cubic-bezier(.7,0,.24,1);
+  will-change:transform;
+}
+.track.dragging{transition:none;}
+
+.scene{
+  position:absolute;left:0;top:0;width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  padding:clamp(20px,5vw,64px);
+  padding-bottom:calc(clamp(20px,5vw,64px) + env(safe-area-inset-bottom,0px));
+  overflow:hidden;
+}
+.scene[aria-hidden="true"]{pointer-events:none;}
+
+.scene-inner{
+  position:relative;z-index:3;
+  width:100%;max-width:min(92vw,660px);
+  max-height:100%;
+  display:flex;flex-direction:column;align-items:center;
+  gap:clamp(10px,1.9vh,20px);
+  text-align:center;
+}
+
+/* ============================================================ P5R 装饰层 */
+
+/* 斜切色块：三条不同角度的红/黑斜带，P5R 标志性切割构图 */
+.slabs{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden;}
+.slabs i{
+  position:absolute;left:-25%;width:150%;height:clamp(60px,13vh,132px);
+  transform:rotate(-7deg);display:block;
+}
+.slabs i:nth-child(1){
+  top:6%;background:var(--slash);opacity:.92;
+  box-shadow:0 0 60px var(--glow);
+}
+.slabs i:nth-child(2){
+  top:calc(6% + clamp(60px,13vh,132px) + 6px);
+  background:var(--slash-2);opacity:.55;
+}
+.slabs i:nth-child(3){
+  bottom:8%;height:clamp(40px,9vh,86px);
+  background:var(--slash-2);opacity:.35;transform:rotate(5deg);
+}
+.slabs i:nth-child(1)::after{
+  /* 斜带上的速度线（动感线条） */
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(90deg,
+    rgba(0,0,0,.20) 0 2px,transparent 2px 26px);
+  opacity:.5;
+}
+
+/* 涂鸦笔画线条：手绘感的凌乱斜线，营造"怪盗"动感 */
+.strokes{position:absolute;inset:0;z-index:1;pointer-events:none;
+  overflow:hidden;opacity:.5;}
+.strokes svg{position:absolute;width:100%;height:100%;}
+.strokes path,.strokes line{
+  stroke:var(--accent);fill:none;stroke-linecap:round;
+}
+
+/* 网格 / 噪点 / 暗角 */
+.grid-lines{
+  position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:52px 52px;
+  mask-image:radial-gradient(ellipse at 50% 45%,#000 20%,transparent 78%);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 45%,#000 20%,transparent 78%);
+}
+.grain{
+  position:absolute;inset:0;z-index:2;pointer-events:none;opacity:var(--grain-op);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.vignette{
+  position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,transparent 46%,rgba(0,0,0,.55) 100%);
+}
+[data-theme="light"] .vignette{
+  background:radial-gradient(ellipse at 50% 50%,transparent 52%,rgba(0,0,0,.16) 100%);
+}
+
+/* 光晕 */
+.aura{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.aura::before{
+  content:"";position:absolute;border-radius:50%;filter:blur(80px);
+  width:min(120vw,880px);height:min(120vw,880px);
+  background:radial-gradient(circle,var(--glow) 0%,transparent 68%);
+  top:-46%;left:50%;transform:translateX(-50%);opacity:.72;
+  animation:auraDrift 20s ease-in-out infinite alternate;
+}
+@keyframes auraDrift{
+  0%{transform:translate(-50%,0) scale(1);}
+  100%{transform:translate(-50%,5%) scale(1.14);}
+}
+
+/* 粒子 */
+.particle{
+  position:absolute;border-radius:50%;background:var(--particle);
+  opacity:var(--p-op,.4);animation:floatUp linear infinite;
+  will-change:transform,opacity;
+}
+@keyframes floatUp{
+  0%{transform:translateY(0) scale(.6);opacity:0;}
+  12%{opacity:var(--p-op,.4);}
+  88%{opacity:var(--p-op,.4);}
+  100%{transform:translateY(-118vh) scale(1);opacity:0;}
+}
+
+/* 角落插画 */
+.deco{
+  position:absolute;z-index:1;pointer-events:none;opacity:.9;
+  right:max(3vw,10px);bottom:max(5vh,16px);
+  filter:drop-shadow(0 14px 34px rgba(0,0,0,.55));
+}
+.deco svg{display:block;width:clamp(64px,17vw,116px)!important;height:auto;}
+.bob{animation:bob 5.2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-12px);}}
+.sway{animation:sway 6.4s ease-in-out infinite;}
+@keyframes sway{0%,100%{transform:rotate(-3deg) translateY(0);}50%{transform:rotate(3deg) translateY(-8px);}}
+
+/* ============================================================ P5R 排版 */
+
+/* 章节标签：红底白字斜切小标签 */
+.kicker{
+  display:inline-block;
+  padding:6px 18px;
+  background:var(--accent);color:#fff;
+  font-size:clamp(11px,2.7vw,13px);font-weight:900;
+  letter-spacing:.16em;
+  transform:rotate(calc(var(--slab) * -1));
+  box-shadow:5px 5px 0 rgba(0,0,0,.4);
+  white-space:nowrap;
+}
+
+/* 大字金句（P5R「绑架信」式：逐字错位、大小不一） */
+.rant{
+  font-size:clamp(26px,7.6vw,58px);
+  font-weight:900;line-height:1.16;letter-spacing:-.01em;
+  text-wrap:balance;
+  margin:0;
+}
+.rant b{color:var(--accent);}
+.rant .tilt{display:inline-block;transform:rotate(-3deg);}
+.rant .big{font-size:1.3em;line-height:1;}
+.rant .sm{font-size:.64em;font-weight:700;color:var(--muted);}
+
+/* 「绑架信」感：主标题每行轻微左右错位，但整体保持居中轴 */
+.rant.rant-cover{
+  font-size:clamp(34px,10.6vw,84px);
+  letter-spacing:-.02em;
+  line-height:1.06;
+}
+.rant.rant-cover .tilt{
+  color:var(--accent);
+  text-shadow:3px 3px 0 rgba(0,0,0,.45);
+}
+
+/* 封面：年份衬底水印 */
+.cover-year{
+  position:relative;
+  font-size:clamp(72px,24vw,190px);
+  font-weight:900;line-height:.82;letter-spacing:.02em;
+  color:transparent;
+  -webkit-text-stroke:2px var(--accent);
+  opacity:.22;
+  margin:-.18em 0 -.30em;
+  pointer-events:none;user-select:none;
+}
+
+/* 封面专属：内容整体上移，给底部装饰让位 */
+.scene-cover .scene-inner{gap:clamp(8px,1.5vh,16px);justify-content:center;}
+.scene-cover .deco{opacity:.16;right:-6px;bottom:-10px;z-index:0;}
+.scene-cover .deco svg{width:clamp(120px,42vw,240px)!important;}
+
+/* 超大数字主视觉 */
+.hero{display:flex;align-items:baseline;justify-content:center;gap:.16em;
+  flex-wrap:wrap;}
+.hero-num{
+  font-size:clamp(56px,17vw,150px);
+  font-weight:900;line-height:.9;letter-spacing:-.045em;
+  color:var(--text);
+  text-shadow:4px 4px 0 var(--accent),8px 8px 0 rgba(0,0,0,.32);
+}
+.hero-num.acc{color:var(--accent);text-shadow:4px 4px 0 rgba(0,0,0,.4);}
+.hero-num.sm{font-size:clamp(40px,11vw,92px);}
+/* 宽数字（5 位以上，如 21,273）：收窄字号避免窄屏溢出 */
+.hero-num.wide{font-size:clamp(38px,11.5vw,104px);letter-spacing:-.055em;}
+.hero-num.sm.wide{font-size:clamp(32px,9vw,72px);}
+.hero-unit{
+  font-size:clamp(14px,3.6vw,22px);font-weight:800;
+  color:var(--muted);letter-spacing:.06em;
+}
+
+/* 次级标题（P5R 斜切底衬） */
+.title-slab{
+  display:inline-block;position:relative;
+  font-size:clamp(19px,5vw,34px);font-weight:900;line-height:1.3;
+  padding:2px 16px;
+}
+.title-slab::before{
+  content:"";position:absolute;z-index:-1;
+  left:-6px;right:-6px;top:16%;bottom:8%;
+  background:var(--accent);opacity:.9;
+  transform:rotate(calc(var(--slab) * -.6)) skewX(-6deg);
+}
+.title-slab em{font-style:normal;color:var(--accent-ink);}
+
+/* 正文小字 */
+.line{
+  font-size:clamp(13px,3.4vw,17px);color:var(--muted);
+  line-height:1.9;max-width:34ch;
+}
+.line b{color:var(--text);font-weight:800;}
+.line .hl{color:var(--accent);font-weight:900;}
+
+/* 小字注脚 */
+.footnote{
+  font-size:clamp(10px,2.6vw,12px);color:var(--faint);
+  line-height:1.7;max-width:38ch;
+}
+
+/* ============================================================ 数据卡 */
+.tiles{
+  display:grid;gap:clamp(8px,1.6vw,14px);width:100%;
+  /* 默认两列：4 张卡刚好 2×2，不留孤儿；窄屏自然降成一列 */
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.tiles.one{grid-template-columns:1fr;}
+.tiles.three{grid-template-columns:repeat(3,minmax(0,1fr));}
+/* 卡数多时（≥5）自动三列，避免排成很长的一列 */
+.tiles.dense{grid-template-columns:repeat(auto-fit,minmax(min(30%,110px),1fr));}
+@media (max-width:360px){
+  .tiles,.tiles.three{grid-template-columns:1fr;}
+}
+.tile{
+  position:relative;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-left:4px solid var(--accent);
+  border-radius:2px;
+  padding:clamp(9px,2vw,15px);
+  text-align:left;
+  min-width:0;
+}
+.tile-k{
+  font-size:clamp(9px,2.4vw,11px);font-weight:800;
+  color:var(--muted);letter-spacing:.1em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.tile-v{
+  font-size:clamp(16px,4.2vw,25px);font-weight:900;
+  color:var(--text);line-height:1.2;margin-top:3px;
+  word-break:break-word;
+  /* 长店名等文本最多两行，超出省略——卡片高度可控 */
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
+}
+/* 纯数字/金额用更大的字号 */
+.tile-v.num{font-size:clamp(20px,5.2vw,30px);-webkit-line-clamp:1;
+  font-variant-numeric:tabular-nums;}
+.tile-v.acc{color:var(--accent);}
+.tile-d{
+  font-size:clamp(9px,2.4vw,11.5px);color:var(--faint);
+  margin-top:4px;line-height:1.55;
+}
+
+/* ============================================================ 图表 */
+.chart{width:100%;height:auto;display:block;overflow:visible;}
+.chart-box{
+  width:100%;background:var(--panel);
+  border:1px solid var(--border);border-radius:2px;
+  padding:clamp(10px,2.4vw,18px);
+  position:relative;
+}
+.chart-box::before{
+  content:"";position:absolute;left:0;top:0;width:52px;height:4px;
+  background:var(--accent);
+}
+
+/* 描边入场 */
+[data-anim="draw"]{stroke-dasharray:var(--len,1200);stroke-dashoffset:var(--len,1200);}
+[data-anim="draw"].anim-in{
+  animation:drawIn var(--dur,1.5s) cubic-bezier(.4,0,.2,1) forwards;
+  animation-delay:var(--delay,0ms);
+}
+@keyframes drawIn{to{stroke-dashoffset:0;}}
+
+/* P5R：元素被"甩"进画面（斜切位移 + 轻微旋转） */
+[data-anim="fade"]{opacity:0;}
+[data-anim="fade"].anim-in{
+  animation:fadeUp var(--dur,.6s) cubic-bezier(.22,.61,.36,1) forwards;
+  animation-delay:var(--delay,0ms);
+}
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(26px);}
+  to{opacity:1;transform:none;}
+}
+
+[data-anim="scale"]{opacity:0;transform:scale(.86);}
+[data-anim="scale"].anim-in{
+  animation:scaleIn var(--dur,.65s) cubic-bezier(.22,1.2,.36,1) forwards;
+  animation-delay:var(--delay,0ms);
+}
+@keyframes scaleIn{
+  from{opacity:0;transform:scale(.86) rotate(-2deg);}
+  to{opacity:1;transform:none;}
+}
+
+/* 斜切滑入：P5R 招牌，从侧向甩入并带旋转 */
+[data-anim="slash"]{opacity:0;transform:translateX(-64px) rotate(-9deg) skewX(9deg);}
+[data-anim="slash"].anim-in{
+  animation:slashIn .58s cubic-bezier(.16,.9,.3,1) forwards;
+  animation-delay:var(--delay,0ms);
+}
+@keyframes slashIn{
+  0%{opacity:0;transform:translateX(-64px) rotate(-9deg) skewX(9deg);}
+  62%{opacity:1;transform:translateX(6px) rotate(1.5deg) skewX(-2deg);}
+  100%{opacity:1;transform:none;}
+}
+
+/* 从上落下砸入 */
+[data-anim="slide"]{opacity:0;transform:translateY(-42px) scale(1.06);}
+[data-anim="slide"].anim-in{
+  animation:slideIn .55s cubic-bezier(.2,1.1,.35,1) forwards;
+  animation-delay:var(--delay,0ms);
+}
+@keyframes slideIn{
+  0%{opacity:0;transform:translateY(-42px) scale(1.06);}
+  70%{opacity:1;transform:translateY(4px) scale(.995);}
+  100%{opacity:1;transform:none;}
+}
+
+[data-anim="grow"]{transform:scaleX(0);transform-origin:left center;}
+[data-anim="grow"].anim-in{
+  animation:growX var(--dur,.85s) cubic-bezier(.22,.9,.3,1) forwards;
+  animation-delay:var(--delay,0ms);
+}
+@keyframes growX{to{transform:scaleX(1);}}
+
+/* 环形扇区 */
+.donut-seg{stroke-dashoffset:var(--circ);transition:none;}
+.scene.anim .donut-seg{
+  transition:stroke-dashoffset 1.1s cubic-bezier(.35,0,.2,1);
+  stroke-dashoffset:var(--offset);
+}
+
+/* 条形进度 */
+.prows{display:flex;flex-direction:column;gap:clamp(7px,1.5vw,11px);width:100%;}
+.prow{display:flex;align-items:center;gap:10px;font-size:clamp(11px,2.9vw,13px);}
+.prow-k{flex:0 0 auto;width:5.4em;text-align:right;color:var(--muted);font-weight:700;}
+.prow-track{flex:1 1 auto;height:11px;background:var(--panel-2);overflow:hidden;
+  border-radius:1px;}
+.prow-fill{
+  display:block;height:100%;background:var(--accent);
+  transform-origin:left center;
+}
+.prow-v{flex:0 0 auto;width:3.6em;text-align:left;font-weight:800;color:var(--text);}
+
+/* ============================================================ 标签 */
+.tags{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.tag{
+  font-size:clamp(11px,2.8vw,13px);padding:5px 14px;
+  border:2px solid var(--border);color:var(--text);
+  background:transparent;white-space:nowrap;font-weight:700;
+  transform:rotate(-2deg);
+}
+.tag.hot{
+  border-color:var(--accent);background:var(--accent);color:#fff;
+  transform:rotate(2deg);box-shadow:3px 3px 0 rgba(0,0,0,.35);
+}
+
+/* 数据诚实徽章 */
+.badge{
+  position:fixed;bottom:14px;left:14px;z-index:41;
+  font-size:11px;padding:5px 12px;font-weight:700;
+  border:1px solid var(--border);background:var(--panel);color:var(--muted);
+  border-radius:1px;
+}
+.badge.demo{color:var(--gold);border-color:var(--gold);}
+
+/* ============================================================ HUD */
+.progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:40;
+  background:var(--border);}
+.progress i{
+  display:block;height:100%;width:0;
+  background:var(--accent);
+  box-shadow:0 0 14px var(--glow);
+  transition:width .5s cubic-bezier(.7,0,.24,1);
+}
+
+.hud{
+  position:fixed;top:0;left:0;right:0;z-index:40;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px clamp(14px,4vw,26px);pointer-events:none;
+}
+.hud-chapter{
+  font-size:11px;font-weight:900;letter-spacing:.18em;
+  color:var(--muted);text-transform:uppercase;
+}
+.hud-right{display:flex;gap:8px;pointer-events:auto;}
+.icon-btn{
+  width:34px;height:34px;border-radius:1px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);background:var(--panel);color:var(--muted);
+  font-size:15px;line-height:1;transition:all .2s;
+}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+.icon-btn.off{opacity:.42;}
+
+/* 侧边导轨（替代底部 pager） */
+.rail{
+  position:fixed;right:clamp(8px,2.4vw,16px);top:50%;transform:translateY(-50%);
+  z-index:40;display:flex;flex-direction:column;gap:8px;align-items:center;
+}
+.rail-btn{
+  width:8px;height:8px;border-radius:50%;border:none;padding:0;cursor:pointer;
+  background:var(--border);transition:all .3s;
+}
+.rail-btn:hover{background:var(--muted);}
+.rail-btn.on{background:var(--accent);height:24px;border-radius:1px;
+  box-shadow:0 0 10px var(--glow);}
+
+/* 滑动提示 */
+.hint{
+  position:fixed;bottom:clamp(16px,4vh,30px);left:50%;transform:translateX(-50%);
+  z-index:40;display:flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:700;color:var(--muted);
+  transition:opacity .5s,transform .5s;pointer-events:none;
+}
+.hint.hide{opacity:0;transform:translateX(-50%) translateY(14px);}
+.hint svg{animation:bob 2.4s ease-in-out infinite;}
+
+/* 「点击加速」提示脉冲 */
+.advance-cue{
+  position:fixed;bottom:clamp(16px,4vh,30px);right:clamp(14px,4vw,26px);
+  z-index:40;font-size:11px;font-weight:800;letter-spacing:.1em;
+  color:var(--accent);opacity:0;transition:opacity .3s;pointer-events:none;
+}
+.advance-cue.show{opacity:.9;}
+
+/* ============================================================ 空态 */
+.empty-cover{
+  background:radial-gradient(ellipse at 50% 34%,var(--bg-2) 0%,var(--bg) 64%);
+}
+
+/* ============================================================ 兜底
+   若 JS 未执行（禁用/报错/被拦截），deck.js 不会给 <html> 加 .deck-ready，
+   则强制全部可见——报告"宁可静态可读，也不可白屏"。 */
+html:not(.deck-ready) [data-anim]{opacity:1!important;transform:none!important;
+  animation:none!important;}
+html:not(.deck-ready) [data-anim="draw"]{stroke-dashoffset:0!important;}
+html:not(.deck-ready) .donut-seg{stroke-dashoffset:var(--offset);}
+
+/* 看门狗兜底：动画结束仍不可见的元素，由 JS 打上 .anim-done 强显示 */
+.anim-done{
+  opacity:1!important;transform:none!important;animation:none!important;
+}
+.anim-done[data-anim="draw"]{stroke-dashoffset:0!important;}
+
+/* ============================================================ 降级 */
+@media (prefers-reduced-motion:reduce){
+  .track{transition:none;}
+  .aura::before,.particle,.bob,.sway,.hint svg{animation:none;}
+  .particle{display:none;}
+  [data-anim]{opacity:1!important;transform:none!important;animation:none!important;}
+  .donut-seg{transition:none;stroke-dashoffset:var(--offset);}
+  [data-anim="draw"]{stroke-dashoffset:0!important;}
+}
+/* 用户手动开省电模式 */
+html.motion-off .track{transition:none;}
+html.motion-off .particle,
+html.motion-off .aura::before,
+html.motion-off .bob,
+html.motion-off .sway{animation:none!important;display:none;}
+html.motion-off [data-anim]{
+  opacity:1!important;transform:none!important;animation:none!important;
+}
+html.motion-off [data-anim="draw"]{stroke-dashoffset:0!important;}
+html.motion-off .donut-seg{transition:none;stroke-dashoffset:var(--offset);}
+
+/* 窄屏微调 */
+@media (max-width:560px){
+  .deco{opacity:.34;transform:scale(.8);right:-4px;}
+  .grid-lines{background-size:40px 40px;}
+  .rail{right:7px;gap:6px;}
+  .scene{padding-left:16px;padding-right:16px;}
+  .slabs i{height:clamp(46px,10vh,88px);}
+}
+/* 矮屏（横屏手机） */
+@media (max-height:600px){
+  .scene{padding-top:46px;padding-bottom:46px;}
+  .scene-inner{gap:7px;}
+  .hero-num{font-size:clamp(40px,11vh,84px);}
+  .rant{font-size:clamp(20px,5.4vh,34px);}
+  .deco{display:none;}
+  .slabs i:nth-child(3){display:none;}
+}
+
+/* ============================================================ 打印 */
+@media print{
+  .hud,.rail,.hint,.progress,.badge,.particle,.aura,.grain,.vignette,
+  .advance-cue{display:none!important;}
+  body{overflow:visible;background:#fff;color:#111;}
+  .stage,.track{position:static;inset:auto;transform:none!important;transition:none;}
+  .scene{position:static;height:auto;min-height:auto;
+    page-break-after:always;padding:30px 20px;background:#fff;}
+  .slabs i{opacity:.1;background:#B0180E;}
+  [data-anim],.donut-seg{opacity:1!important;transform:none!important;
+    stroke-dashoffset:0!important;animation:none!important;}
+  .hero-num{color:#B0180E!important;text-shadow:none!important;}
+  .line,.tile-d{color:#555;}
+  .tile{border:1px solid #ccc;}
+}
+</style>
+<script>document.documentElement.className+=" deck-ready";</script>
+</head>
+<body>
+<div class="progress"><i id="progressBar"></i></div>
+
+<div class="hud">
+  <div class="hud-chapter" id="chapterLabel">封面</div>
+  <div class="hud-right">
+    <button class="icon-btn" id="btnReplay" type="button"
+            title="重播本屏（R）" aria-label="重播本屏">⟳</button>
+    <button class="icon-btn" id="btnMotion" type="button"
+            title="动效 / 省电模式" aria-label="切换动效">✧</button>
+    <button class="icon-btn" id="btnThemeTop" type="button"
+            title="明暗主题" aria-label="切换主题">◐</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="track" id="track">
+<section class="scene scene-cover" data-scene="cover" data-chapter="0" data-chapter-name="封面" data-particles="26" data-decor="burger" aria-hidden="true" role="group" aria-label="封面"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-burger bob"><svg style="width:128px;height:auto" viewBox="0 0 120 112" xmlns="http://www.w3.org/2000/svg"><ellipse cx="60" cy="30" rx="47" ry="27" fill="#F2A900"/><ellipse cx="60" cy="27" rx="47" ry="25" fill="#FFC72C"/><circle cx="41" cy="19" r="2.3" fill="#FFF3C4"/><circle cx="60" cy="13" r="2.3" fill="#FFF3C4"/><circle cx="79" cy="19" r="2.3" fill="#FFF3C4"/><circle cx="51" cy="32" r="2" fill="#FFF3C4"/><circle cx="70" cy="33" r="2" fill="#FFF3C4"/><rect x="13" y="46" width="94" height="11" rx="5.5" fill="#7CB342"/><rect x="11" y="59" width="98" height="10" rx="5" fill="#E53935"/><path d="M13 71 L107 71 L107 80 Q60 91 13 80 Z" fill="#F2A900"/><ellipse cx="60" cy="94" rx="47" ry="13" fill="#FFC72C"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">McWrapped · 麦门年度账本</div><div class="cover-year" aria-hidden="true" data-anim="fade" data-beat="0">2026</div><p class="rant rant-cover" data-anim="slide" data-beat="1">这一年，<br/>你在麦门<br/>留下了 <span class="tilt">40</span> 个瞬间</p><div class="footnote" data-anim="fade" data-beat="3">数据来源：演示数据（非真实订单）</div><button class="btn" id="startBtn" type="button" data-anim="scale" data-beat="2">翻开账本 ✦</button><div class="footnote" data-anim="fade" data-beat="3"><span class="check">✓</span> 授权麦当劳 MCP 对本人账号订餐数据做年度统计与展示</div></div></section>
+<section class="scene " data-scene="overview" data-chapter="1" data-chapter-name="年度总览" data-particles="16" data-decor="fries" aria-hidden="true" role="group" aria-label="年度总览"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-fries sway"><svg style="width:112px;height:auto" viewBox="0 0 100 132" xmlns="http://www.w3.org/2000/svg"><rect x="29" y="26" width="11" height="50" rx="3" fill="#FFD75E"/><rect x="44" y="14" width="11" height="62" rx="3" fill="#FFC72C"/><rect x="59" y="28" width="11" height="48" rx="3" fill="#FFD75E"/><rect x="73" y="20" width="11" height="56" rx="3" fill="#FFC72C"/><path d="M21 74 L29 124 L71 124 L79 74 Z" fill="#DA291C"/><path d="M21 74 L79 74 L77 87 L23 87 Z" fill="#B91C1C"/><path d="M39 98 L61 98 L59 112 L41 112 Z" fill="#FFC72C" opacity=".92"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第一章 · 年度总览</div><div class="hero" data-anim="scale" data-beat="1"><span class="hero-num " data-count="40" data-prefix="" data-suffix="" data-decimals="0" data-count-dur="1300" data-anim="fade" data-beat="1">40</span><span class="hero-unit">次下单</span></div><p class="rant " data-anim="fade" data-beat="2">平均每 <b>1.4</b> 天，<br/>你就想再来一次</p><div class="tiles "><div class="tile" data-anim="fade" data-beat="3"><div class="tile-k">主战场</div><div class="tile-v  acc">科技园店</div><div class="tile-d">在此下了 11 单</div></div><div class="tile" data-anim="fade" data-beat="3"><div class="tile-k">最常光顾</div><div class="tile-v">周二</div><div class="tile-d">10 单落在这天</div></div><div class="tile" data-anim="fade" data-beat="4"><div class="tile-k">到店 / 外送</div><div class="tile-v">21 / 19</div><div class="tile-d">堂食与外送之比</div></div><div class="tile" data-anim="fade" data-beat="4"><div class="tile-k">跨域时间</div><div class="tile-v num">55 天</div><div class="tile-d">2026-08-16 起</div></div></div></div></section>
+<section class="scene " data-scene="spend" data-chapter="2" data-chapter-name="真金白银" data-particles="18" data-decor="drink" aria-hidden="true" role="group" aria-label="真金白银"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-drink bob"><svg style="width:104px;height:auto" viewBox="0 0 92 124" xmlns="http://www.w3.org/2000/svg"><path d="M20 36 L29 116 L63 116 L72 36 Z" fill="#DA291C"/><path d="M26 46 L33 108 L59 108 L66 46 Z" fill="#B91C1C"/><text x="46" y="84" fill="#FFF8E7" font-size="26" font-weight="800" text-anchor="middle" font-family="Arial Black,Arial,sans-serif">M</text><rect x="15" y="25" width="62" height="13" rx="5.5" fill="#FFF8E7"/><line x1="47" y1="27" x2="63" y2="5" stroke="#FFF8E7" stroke-width="5.5" stroke-linecap="round"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第二章 · 真金白银</div><div class="hero" data-anim="scale" data-beat="1"><span class="hero-num acc" data-count="1060" data-prefix="¥" data-suffix="" data-decimals="0" data-count-dur="1500" data-anim="fade" data-beat="1">¥1,060</span></div><p class="rant " data-anim="fade" data-beat="2">折合 <span class="big">42</span> 个巨无霸，<br/><span class="sm">平均每天为快乐买单 ¥19.3</span></p><div class="tiles three"><div class="tile" data-anim="fade" data-beat="3"><div class="tile-k">客单价</div><div class="tile-v num acc">¥26.5</div><div class="tile-d">每单出手</div></div><div class="tile" data-anim="fade" data-beat="4"><div class="tile-k">最贵一单</div><div class="tile-v num">¥45</div><div class="tile-d">巨无霸</div></div></div></div></section>
+<section class="scene " data-scene="calories" data-chapter="3" data-chapter-name="热量账本" data-particles="14" data-decor="cone" aria-hidden="true" role="group" aria-label="热量账本"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-cone bob"><svg style="width:92px;height:auto" viewBox="0 0 80 122" xmlns="http://www.w3.org/2000/svg"><path d="M40 98 L25 45 L55 45 Z" fill="#F2A900"/><path d="M30 54 L50 54 M33 64 L47 64 M36 74 L44 74" stroke="#C47E00" stroke-width="2.2"/><path d="M23 45 Q19 20 40 18 Q61 20 57 45 Z" fill="#FFF3C4"/><path d="M40 18 Q34 34 40 45 Q46 34 40 18 Z" fill="#FFE7A3"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第三章 · 热量账本</div><div class="hero" data-anim="scale" data-beat="1"><span class="hero-num acc wide" data-count="21273" data-prefix="" data-suffix="" data-decimals="0" data-count-dur="1600" data-anim="fade" data-beat="1">21,273</span><span class="hero-unit">kcal</span></div><p class="rant " data-anim="fade" data-beat="2">大约要跑 <span class="big">35</span> 小时<br/><span class="sm">才能消耗掉这一年的快乐</span></p><div class="chart-box" data-anim="scale" data-beat="3"><svg viewBox="0 0 720 250" class="chart" role="img" aria-label="趋势折线图"><defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".30"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><line x1="52" y1="208.0" x2="702" y2="208.0" stroke="var(--grid)" stroke-width="1" data-anim="fade" data-anim-delay="60"/><text x="44" y="211.5" fill="var(--faint)" font-size="10" text-anchor="end">0</text><line x1="52" y1="162.0" x2="702" y2="162.0" stroke="var(--grid)" stroke-width="1" data-anim="fade" data-anim-delay="100"/><text x="44" y="165.5" fill="var(--faint)" font-size="10" text-anchor="end">2,065</text><line x1="52" y1="116.0" x2="702" y2="116.0" stroke="var(--grid)" stroke-width="1" data-anim="fade" data-anim-delay="140"/><text x="44" y="119.5" fill="var(--faint)" font-size="10" text-anchor="end">4,130</text><line x1="52" y1="70.0" x2="702" y2="70.0" stroke="var(--grid)" stroke-width="1" data-anim="fade" data-anim-delay="180"/><text x="44" y="73.5" fill="var(--faint)" font-size="10" text-anchor="end">6,195</text><line x1="52" y1="24.0" x2="702" y2="24.0" stroke="var(--grid)" stroke-width="1" data-anim="fade" data-anim-delay="220"/><text x="44" y="27.5" fill="var(--faint)" font-size="10" text-anchor="end">8,260</text><line x1="52" y1="52.1" x2="702" y2="52.1" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="7 5" data-anim="fade" data-anim-delay="500"/><text x="58" y="45.1" fill="var(--warn)" font-size="10" data-anim="fade" data-anim-delay="560">周预算 7,000</text><path d="M52.0,208.0 L52.0,188.7 69.6,201.4 87.1,188.7 104.7,201.4 122.3,201.7 139.8,194.3 157.4,192.0 175.0,203.3 192.5,186.9 210.1,202.8 227.7,201.4 245.2,201.7 262.8,198.2 280.4,202.8 297.9,203.1 315.5,186.9 333.1,198.2 350.6,186.9 368.2,180.9 385.8,202.1 403.4,188.7 420.9,201.4 438.5,192.0 456.1,192.0 473.6,188.7 491.2,203.0 508.8,203.0 526.3,192.0 543.9,182.9 561.5,201.4 579.0,191.3 596.6,191.3 614.2,186.9 631.7,202.8 649.3,203.0 666.9,194.3 684.4,203.0 702.0,188.7 L702.0,208.0 Z" fill="url(#areaGrad)" data-anim="fade" data-anim-delay="620"/><path d="M52.0,188.7 L69.6,201.4 L87.1,188.7 L104.7,201.4 L122.3,201.7 L139.8,194.3 L157.4,192.0 L175.0,203.3 L192.5,186.9 L210.1,202.8 L227.7,201.4 L245.2,201.7 L262.8,198.2 L280.4,202.8 L297.9,203.1 L315.5,186.9 L333.1,198.2 L350.6,186.9 L368.2,180.9 L385.8,202.1 L403.4,188.7 L420.9,201.4 L438.5,192.0 L456.1,192.0 L473.6,188.7 L491.2,203.0 L508.8,203.0 L526.3,192.0 L543.9,182.9 L561.5,201.4 L579.0,191.3 L596.6,191.3 L614.2,186.9 L631.7,202.8 L649.3,203.0 L666.9,194.3 L684.4,203.0 L702.0,188.7" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" data-anim="draw" data-anim-delay="260" style="--dur:1.5s"/><circle cx="368.2" cy="180.9" r="7" fill="none" stroke="var(--warn)" stroke-width="2" opacity=".85" data-anim="scale" data-anim-delay="1200"/><circle cx="52.0" cy="188.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="900"/><circle cx="69.6" cy="201.4" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="955"/><circle cx="87.1" cy="188.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1010"/><circle cx="104.7" cy="201.4" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1065"/><circle cx="122.3" cy="201.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1120"/><circle cx="139.8" cy="194.3" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1175"/><circle cx="157.4" cy="192.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1230"/><circle cx="175.0" cy="203.3" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1285"/><circle cx="192.5" cy="186.9" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1340"/><circle cx="210.1" cy="202.8" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1395"/><circle cx="227.7" cy="201.4" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1450"/><circle cx="245.2" cy="201.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1505"/><circle cx="262.8" cy="198.2" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1560"/><circle cx="280.4" cy="202.8" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1615"/><circle cx="297.9" cy="203.1" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1670"/><circle cx="315.5" cy="186.9" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1725"/><circle cx="333.1" cy="198.2" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1780"/><circle cx="350.6" cy="186.9" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1835"/><circle cx="368.2" cy="180.9" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1890"/><circle cx="385.8" cy="202.1" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="1945"/><circle cx="403.4" cy="188.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2000"/><circle cx="420.9" cy="201.4" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2055"/><circle cx="438.5" cy="192.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2110"/><circle cx="456.1" cy="192.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2165"/><circle cx="473.6" cy="188.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2220"/><circle cx="491.2" cy="203.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2275"/><circle cx="508.8" cy="203.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2330"/><circle cx="526.3" cy="192.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2385"/><circle cx="543.9" cy="182.9" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2440"/><circle cx="561.5" cy="201.4" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2495"/><circle cx="579.0" cy="191.3" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2550"/><circle cx="596.6" cy="191.3" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2605"/><circle cx="614.2" cy="186.9" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2660"/><circle cx="631.7" cy="202.8" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2715"/><circle cx="649.3" cy="203.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2770"/><circle cx="666.9" cy="194.3" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2825"/><circle cx="684.4" cy="203.0" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2880"/><circle cx="702.0" cy="188.7" r="3.5" fill="var(--accent)" data-anim="scale" data-anim-delay="2935"/><text x="52.0" y="236" fill="var(--faint)" font-size="10" text-anchor="start">8/10</text><text x="157.4" y="236" fill="var(--faint)" font-size="10" text-anchor="middle">8/24</text><text x="262.8" y="236" fill="var(--faint)" font-size="10" text-anchor="middle">8/31</text><text x="368.2" y="236" fill="var(--faint)" font-size="10" text-anchor="middle">9/7</text><text x="473.6" y="236" fill="var(--faint)" font-size="10" text-anchor="middle">9/14</text><text x="579.0" y="236" fill="var(--faint)" font-size="10" text-anchor="middle">9/28</text><text x="684.4" y="236" fill="var(--faint)" font-size="10" text-anchor="middle">10/5</text><text x="702.0" y="236" fill="var(--faint)" font-size="10" text-anchor="end">10/5</text></svg></div><div class="footnote" data-anim="fade" data-beat="4">虚线为建议周预算 7,000 kcal · 有 <b>0</b> 周超标</div></div></section>
+<section class="scene " data-scene="category" data-chapter="4" data-chapter-name="品类偏好" data-particles="12" data-decor="burger" aria-hidden="true" role="group" aria-label="品类偏好"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-burger bob"><svg style="width:128px;height:auto" viewBox="0 0 120 112" xmlns="http://www.w3.org/2000/svg"><ellipse cx="60" cy="30" rx="47" ry="27" fill="#F2A900"/><ellipse cx="60" cy="27" rx="47" ry="25" fill="#FFC72C"/><circle cx="41" cy="19" r="2.3" fill="#FFF3C4"/><circle cx="60" cy="13" r="2.3" fill="#FFF3C4"/><circle cx="79" cy="19" r="2.3" fill="#FFF3C4"/><circle cx="51" cy="32" r="2" fill="#FFF3C4"/><circle cx="70" cy="33" r="2" fill="#FFF3C4"/><rect x="13" y="46" width="94" height="11" rx="5.5" fill="#7CB342"/><rect x="11" y="59" width="98" height="10" rx="5" fill="#E53935"/><path d="M13 71 L107 71 L107 80 Q60 91 13 80 Z" fill="#F2A900"/><ellipse cx="60" cy="94" rx="47" ry="13" fill="#FFC72C"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第四章 · 品类偏好</div><div data-anim="scale" data-beat="1" style="width:100%"><div class="donut-wrap" style="display:flex;gap:26px;align-items:center;justify-content:center;flex-wrap:wrap;width:100%"><svg viewBox="0 0 260 260" class="chart" style="max-width:260px;flex:0 1 260px" role="img" aria-label="品类占比环形图" data-donut="1"><circle cx="130" cy="130" r="88" fill="none" stroke="var(--grid)" stroke-width="30" data-anim="fade"/><circle class="donut-seg" cx="130" cy="130" r="88" fill="none" stroke="#E60012" stroke-width="30" stroke-linecap="butt" stroke-dasharray="240.99 311.93" stroke-dashoffset="-0.00" transform="rotate(-90 130 130)" data-len="240.99" data-circ="552.92" data-name="主餐"/><circle class="donut-seg" cx="130" cy="130" r="88" fill="none" stroke="#FFF6EA" stroke-width="30" stroke-linecap="butt" stroke-dasharray="151.27 401.65" stroke-dashoffset="-240.99" transform="rotate(-90 130 130)" data-len="151.27" data-circ="552.92" data-name="小吃"/><circle class="donut-seg" cx="130" cy="130" r="88" fill="none" stroke="#FFB300" stroke-width="30" stroke-linecap="butt" stroke-dasharray="88.15 464.77" stroke-dashoffset="-392.26" transform="rotate(-90 130 130)" data-len="88.15" data-circ="552.92" data-name="饮品"/><circle class="donut-seg" cx="130" cy="130" r="88" fill="none" stroke="#00A0E9" stroke-width="30" stroke-linecap="butt" stroke-dasharray="72.51 480.41" stroke-dashoffset="-480.41" transform="rotate(-90 130 130)" data-len="72.51" data-circ="552.92" data-name="甜品"/><text x="130" y="128" fill="var(--text)" font-size="26" font-weight="800" text-anchor="middle" data-anim="scale" data-anim-delay="900">¥1,060</text><text x="130" y="150" fill="var(--muted)" font-size="11" text-anchor="middle">总花费</text></svg><div class="legend" style="flex:1 1 220px;min-width:180px"><div class="legend-row" data-anim="fade" data-anim-delay="420"><span class="legend-dot" style="background:#E60012"></span><span>主餐</span><span class="legend-val">¥462 · 44%</span></div><div class="legend-row" data-anim="fade" data-anim-delay="510"><span class="legend-dot" style="background:#FFF6EA"></span><span>小吃</span><span class="legend-val">¥290 · 27%</span></div><div class="legend-row" data-anim="fade" data-anim-delay="600"><span class="legend-dot" style="background:#FFB300"></span><span>饮品</span><span class="legend-val">¥169 · 16%</span></div><div class="legend-row" data-anim="fade" data-anim-delay="690"><span class="legend-dot" style="background:#00A0E9"></span><span>甜品</span><span class="legend-val">¥139 · 13%</span></div></div></div></div><div class="hero" data-anim="fade" data-beat="2"><span class="hero-num sm acc" data-count="462" data-prefix="¥" data-suffix="" data-decimals="0" data-count-dur="1400" data-anim="fade" data-beat="2">¥462</span></div><p class="rant " data-anim="fade" data-beat="3">你的胃，<br/>最偏向 <b>主餐</b></p><div class="footnote" data-anim="fade" data-beat="4"><b>44%</b> 的花费都给了它 · 小吃 27% · 饮品 16% · 甜品 13%</div></div></section>
+<section class="scene " data-scene="top_items" data-chapter="5" data-chapter-name="心头好" data-particles="12" data-decor="fries" aria-hidden="true" role="group" aria-label="心头好"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-fries sway"><svg style="width:112px;height:auto" viewBox="0 0 100 132" xmlns="http://www.w3.org/2000/svg"><rect x="29" y="26" width="11" height="50" rx="3" fill="#FFD75E"/><rect x="44" y="14" width="11" height="62" rx="3" fill="#FFC72C"/><rect x="59" y="28" width="11" height="48" rx="3" fill="#FFD75E"/><rect x="73" y="20" width="11" height="56" rx="3" fill="#FFC72C"/><path d="M21 74 L29 124 L71 124 L79 74 Z" fill="#DA291C"/><path d="M21 74 L79 74 L77 87 L23 87 Z" fill="#B91C1C"/><path d="M39 98 L61 98 L59 112 L41 112 Z" fill="#FFC72C" opacity=".92"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第五章 · 心头好</div><div class="hero" data-anim="scale" data-beat="1"><span class="hero-num acc" data-count="14" data-prefix="" data-suffix="" data-decimals="0" data-count-dur="1400" data-anim="fade" data-beat="1">14</span><span class="hero-unit">份</span></div><p class="rant " data-anim="slide" data-beat="2">陪你最多的，<br/>是 <b>中薯条</b></p><div class="chart-box" data-anim="scale" data-beat="3"><svg viewBox="0 0 720 226" class="chart" role="img" aria-label="排行条形图"><text x="12" y="26" fill="var(--text)" font-size="13" data-anim="fade" data-anim-delay="120">中薯条</text><rect x="144" y="11" width="492.0" height="20" rx="10" fill="#E60012" fill-opacity=".92" data-anim="grow" data-anim-delay="180" style="--dur:.9s" transform-origin="144px 21px"/><text x="712" y="26" fill="var(--muted)" font-size="12" text-anchor="end" data-anim="fade" data-anim-delay="620">14 份</text><text x="12" y="68" fill="var(--text)" font-size="13" data-anim="fade" data-anim-delay="200">可乐中杯</text><rect x="144" y="53" width="492.0" height="20" rx="10" fill="#FFF6EA" fill-opacity=".92" data-anim="grow" data-anim-delay="270" style="--dur:.9s" transform-origin="144px 63px"/><text x="712" y="68" fill="var(--muted)" font-size="12" text-anchor="end" data-anim="fade" data-anim-delay="680">14 份</text><text x="12" y="110" fill="var(--text)" font-size="13" data-anim="fade" data-anim-delay="280">双层吉士汉堡</text><rect x="144" y="95" width="175.7" height="20" rx="10" fill="#FFB300" fill-opacity=".92" data-anim="grow" data-anim-delay="360" style="--dur:.9s" transform-origin="144px 105px"/><text x="712" y="110" fill="var(--muted)" font-size="12" text-anchor="end" data-anim="fade" data-anim-delay="740">5 份</text><text x="12" y="152" fill="var(--text)" font-size="13" data-anim="fade" data-anim-delay="360">草莓麦旋风</text><rect x="144" y="137" width="175.7" height="20" rx="10" fill="#00A0E9" fill-opacity=".92" data-anim="grow" data-anim-delay="450" style="--dur:.9s" transform-origin="144px 147px"/><text x="712" y="152" fill="var(--muted)" font-size="12" text-anchor="end" data-anim="fade" data-anim-delay="800">5 份</text><text x="12" y="194" fill="var(--text)" font-size="13" data-anim="fade" data-anim-delay="440">巨无霸</text><rect x="144" y="179" width="175.7" height="20" rx="10" fill="#8B0010" fill-opacity=".92" data-anim="grow" data-anim-delay="540" style="--dur:.9s" transform-origin="144px 189px"/><text x="712" y="194" fill="var(--muted)" font-size="12" text-anchor="end" data-anim="fade" data-anim-delay="860">5 份</text></svg></div><div class="footnote" data-anim="fade" data-beat="4">一共点了 <b>14</b> 份 · 花费 ¥168.0</div></div></section>
+<section class="scene " data-scene="time_of_day" data-chapter="6" data-chapter-name="时间线" data-particles="10" data-decor="drink" aria-hidden="true" role="group" aria-label="时间线"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-drink bob"><svg style="width:104px;height:auto" viewBox="0 0 92 124" xmlns="http://www.w3.org/2000/svg"><path d="M20 36 L29 116 L63 116 L72 36 Z" fill="#DA291C"/><path d="M26 46 L33 108 L59 108 L66 46 Z" fill="#B91C1C"/><text x="46" y="84" fill="#FFF8E7" font-size="26" font-weight="800" text-anchor="middle" font-family="Arial Black,Arial,sans-serif">M</text><rect x="15" y="25" width="62" height="13" rx="5.5" fill="#FFF8E7"/><line x1="47" y1="27" x2="63" y2="5" stroke="#FFF8E7" stroke-width="5.5" stroke-linecap="round"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第六章 · 时间线</div><p class="rant " data-anim="slide" data-beat="1">你最爱在 <b>晚 (17-20)</b><br/>按下下单键</p><div class="tiles three"><div class="tile" data-anim="fade" data-beat="2"><div class="tile-k">最高频时段</div><div class="tile-v  acc">晚 (17-20)</div><div class="tile-d">15 单落在这里</div></div><div class="tile" data-anim="fade" data-beat="2"><div class="tile-k">深夜下单</div><div class="tile-v num">6 单</div><div class="tile-d">凌晨的快乐</div></div><div class="tile" data-anim="fade" data-beat="3"><div class="tile-k">早餐时段</div><div class="tile-v num">6 单</div><div class="tile-d">一天从麦开始</div></div></div><div style="width:100%;max-width:520px" data-anim="fade" data-beat="4"><div class="prows"><div class="prow" data-anim="fade" data-anim-delay="140"><span class="prow-label">早 (5-9)</span><span class="prow-track"><i style="width:40.0%;background:#E60012"></i></span><span class="prow-val">6 单 · 15%</span></div><div class="prow" data-anim="fade" data-anim-delay="230"><span class="prow-label">午 (10-13)</span><span class="prow-track"><i style="width:80.0%;background:#FFF6EA"></i></span><span class="prow-val">12 单 · 30%</span></div><div class="prow" data-anim="fade" data-anim-delay="320"><span class="prow-label">下午 (14-16)</span><span class="prow-track"><i style="width:6.7%;background:#FFB300"></i></span><span class="prow-val">1 单 · 2%</span></div><div class="prow" data-anim="fade" data-anim-delay="410"><span class="prow-label">晚 (17-20)</span><span class="prow-track"><i style="width:100.0%;background:#00A0E9"></i></span><span class="prow-val">15 单 · 38%</span></div><div class="prow" data-anim="fade" data-anim-delay="500"><span class="prow-label">夜 (21-4)</span><span class="prow-track"><i style="width:40.0%;background:#8B0010"></i></span><span class="prow-val">6 单 · 15%</span></div></div></div></div></section>
+<section class="scene " data-scene="weekday" data-chapter="7" data-chapter-name="一周节律" data-particles="12" data-decor="pie" aria-hidden="true" role="group" aria-label="一周节律"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-pie sway"><svg style="width:100px;height:auto" viewBox="0 0 112 86" xmlns="http://www.w3.org/2000/svg"><path d="M15 66 L30 22 L96 22 L81 66 Z" fill="#F2A900"/><path d="M30 22 L96 22 L92 35 L27 35 Z" fill="#FFC72C"/><path d="M38 42 L88 42 M42 52 L84 52 M46 62 L80 62" stroke="#C47E00" stroke-width="2.2" opacity=".68"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第七章 · 一周节律</div><div class="hero" data-anim="scale" data-beat="1"><span class="hero-num " data-count="10" data-prefix="" data-suffix="" data-decimals="0" data-count-dur="1300" data-anim="fade" data-beat="1">10</span><span class="hero-unit">单</span></div><p class="rant " data-anim="slide" data-beat="2"><b>周二</b><br/>是你的快乐日</p><div class="chart-box" data-anim="scale" data-beat="3"><svg viewBox="0 0 720 232" class="chart" role="img" aria-label="柱状图"><rect x="46.0" y="127.2" width="52.0" height="64.8" rx="7" fill="var(--panel2)" stroke="var(--border)" data-anim="grow" data-anim-delay="180" style="--dur:.8s" transform-origin="46.0px 192.0px"/><text x="72.0" y="119.2" fill="var(--muted)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="520">4</text><text x="72.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周一</text><rect x="142.0" y="30.0" width="52.0" height="162.0" rx="7" fill="var(--accent)" stroke="none" data-anim="grow" data-anim-delay="250" style="--dur:.8s" transform-origin="142.0px 192.0px"/><text x="168.0" y="22.0" fill="var(--accent)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="580">10</text><text x="168.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周二</text><rect x="238.0" y="111.0" width="52.0" height="81.0" rx="7" fill="var(--panel2)" stroke="var(--border)" data-anim="grow" data-anim-delay="320" style="--dur:.8s" transform-origin="238.0px 192.0px"/><text x="264.0" y="103.0" fill="var(--muted)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="640">5</text><text x="264.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周三</text><rect x="334.0" y="127.2" width="52.0" height="64.8" rx="7" fill="var(--panel2)" stroke="var(--border)" data-anim="grow" data-anim-delay="390" style="--dur:.8s" transform-origin="334.0px 192.0px"/><text x="360.0" y="119.2" fill="var(--muted)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="700">4</text><text x="360.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周四</text><rect x="430.0" y="78.6" width="52.0" height="113.4" rx="7" fill="var(--panel2)" stroke="var(--border)" data-anim="grow" data-anim-delay="460" style="--dur:.8s" transform-origin="430.0px 192.0px"/><text x="456.0" y="70.6" fill="var(--muted)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="760">7</text><text x="456.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周五</text><rect x="526.0" y="94.8" width="52.0" height="97.2" rx="7" fill="var(--panel2)" stroke="var(--border)" data-anim="grow" data-anim-delay="530" style="--dur:.8s" transform-origin="526.0px 192.0px"/><text x="552.0" y="86.8" fill="var(--muted)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="820">6</text><text x="552.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周六</text><rect x="622.0" y="127.2" width="52.0" height="64.8" rx="7" fill="var(--panel2)" stroke="var(--border)" data-anim="grow" data-anim-delay="600" style="--dur:.8s" transform-origin="622.0px 192.0px"/><text x="648.0" y="119.2" fill="var(--muted)" font-size="13" font-weight="700" text-anchor="middle" data-anim="fade" data-anim-delay="880">4</text><text x="648.0" y="218" fill="var(--muted)" font-size="12" text-anchor="middle">周日</text></svg></div><div class="footnote" data-anim="fade" data-beat="4">这天下了 <b>10</b> 单，占全周的 <b>25%</b></div></div></section>
+<section class="scene " data-scene="highlights" data-chapter="8" data-chapter-name="高光时刻" data-particles="20" data-decor="cone" aria-hidden="true" role="group" aria-label="高光时刻"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-cone bob"><svg style="width:92px;height:auto" viewBox="0 0 80 122" xmlns="http://www.w3.org/2000/svg"><path d="M40 98 L25 45 L55 45 Z" fill="#F2A900"/><path d="M30 54 L50 54 M33 64 L47 64 M36 74 L44 74" stroke="#C47E00" stroke-width="2.2"/><path d="M23 45 Q19 20 40 18 Q61 20 57 45 Z" fill="#FFF3C4"/><path d="M40 18 Q34 34 40 45 Q46 34 40 18 Z" fill="#FFE7A3"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第八章 · 高光时刻</div><p class="rant " data-anim="slide" data-beat="1">热量巅峰周</p><div class="hero" data-anim="scale" data-beat="2"><span class="hero-num sm acc wide">1215 kcal</span></div><div class="line " data-anim="fade" data-beat="2">从 9/7 那一周开始</div><div class="tiles "><div class="tile" data-anim="fade" data-beat="3"><div class="tile-k">最贵的一单</div><div class="tile-v num">¥45</div><div class="tile-d">巨无霸</div></div><div class="tile" data-anim="fade" data-beat="4"><div class="tile-k">最猛的一单</div><div class="tile-v">949 kcal</div><div class="tile-d">巨无霸</div></div><div class="tile" data-anim="fade" data-beat="5"><div class="tile-k">深夜出没</div><div class="tile-v num">6 次</div><div class="tile-d">21 点后 / 凌晨下单</div></div></div></div></section>
+<section class="scene " data-scene="persona" data-chapter="9" data-chapter-name="消费人格" data-particles="22" data-decor="burger" aria-hidden="true" role="group" aria-label="消费人格"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-burger bob"><svg style="width:128px;height:auto" viewBox="0 0 120 112" xmlns="http://www.w3.org/2000/svg"><ellipse cx="60" cy="30" rx="47" ry="27" fill="#F2A900"/><ellipse cx="60" cy="27" rx="47" ry="25" fill="#FFC72C"/><circle cx="41" cy="19" r="2.3" fill="#FFF3C4"/><circle cx="60" cy="13" r="2.3" fill="#FFF3C4"/><circle cx="79" cy="19" r="2.3" fill="#FFF3C4"/><circle cx="51" cy="32" r="2" fill="#FFF3C4"/><circle cx="70" cy="33" r="2" fill="#FFF3C4"/><rect x="13" y="46" width="94" height="11" rx="5.5" fill="#7CB342"/><rect x="11" y="59" width="98" height="10" rx="5" fill="#E53935"/><path d="M13 71 L107 71 L107 80 Q60 91 13 80 Z" fill="#F2A900"/><ellipse cx="60" cy="94" rx="47" ry="13" fill="#FFC72C"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">第九章 · 消费人格</div><p class="rant " data-anim="scale" data-beat="1">测出来，你是<br/><span class="tilt">麦门常客</span></p><div class="line " data-anim="fade" data-beat="2">稳定的幸福，是一份熟悉的味道。</div><div class="tags" data-anim="fade" data-beat="3"><span class="tag hot" data-anim="fade" data-beat="3">麦门常客</span></div><div class="tags" data-anim="fade" data-beat="4"><span class="tag" data-anim="fade" data-beat="4">麦门常客</span><span class="tag" data-anim="fade" data-beat="4">主餐</span></div></div></section>
+<section class="scene " data-scene="outro" data-chapter="10" data-chapter-name="尾声" data-particles="24" data-decor="fries" aria-hidden="true" role="group" aria-label="尾声"><div class="aura" aria-hidden="true"></div><div class="slabs" aria-hidden="true"><i></i><i></i><i></i></div><div class="strokes" aria-hidden="true"><svg viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 120 L200 96" stroke-width="3" opacity=".55"/><path d="M120 40 L150 210" stroke-width="2" opacity=".35"/><path d="M330 300 L420 268" stroke-width="3" opacity=".5"/><path d="M-10 470 L180 440" stroke-width="2" opacity=".32"/><path d="M240 560 L400 524" stroke-width="3" opacity=".45"/><path d="M60 640 L250 604" stroke-width="2" opacity=".3"/></svg></div><div class="grid-lines" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div class="deco deco-fries sway"><svg style="width:112px;height:auto" viewBox="0 0 100 132" xmlns="http://www.w3.org/2000/svg"><rect x="29" y="26" width="11" height="50" rx="3" fill="#FFD75E"/><rect x="44" y="14" width="11" height="62" rx="3" fill="#FFC72C"/><rect x="59" y="28" width="11" height="48" rx="3" fill="#FFD75E"/><rect x="73" y="20" width="11" height="56" rx="3" fill="#FFC72C"/><path d="M21 74 L29 124 L71 124 L79 74 Z" fill="#DA291C"/><path d="M21 74 L79 74 L77 87 L23 87 Z" fill="#B91C1C"/><path d="M39 98 L61 98 L59 112 L41 112 Z" fill="#FFC72C" opacity=".92"/></svg></div><div class="scene-inner"><div class="kicker" data-anim="slash" data-beat="0">尾声 · 2026</div><p class="rant " data-anim="slide" data-beat="1">感谢这一年，<br/>有<b>麦门</b>陪你</p><div class="line " data-anim="fade" data-beat="2"><b>40</b> 次相遇 · <b>¥1,060.0</b> 投入 · <b>21,273</b> kcal 的快乐<br/>2026-08-16 ~ 2026-10-09</div><div class="btn-row" data-anim="fade" data-beat="3"><button class="btn ghost" type="button" id="btnReplayEnd" onclick="McWrapped.reset()">↺ 重新翻阅</button><button class="btn ghost" type="button" id="btnReplay" onclick="McWrapped.replay()">⟳ 重播本屏</button><button class="btn ghost" type="button" id="btnPrint" onclick="window.print()">🖨 存为 PDF</button></div></div></section>
+  </div>
+</div>
+
+<div class="rail" id="rail" role="tablist" aria-label="章节导航"></div>
+
+<div class="hint" id="hint" aria-hidden="true">
+  <span>向下滑动 / 点击继续</span>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5v14M19 12l-7 7-7-7"/>
+  </svg>
+</div>
+<div class="advance-cue" id="advanceCue">点击加速 ▸▸</div>
+
+<div class="badge demo">数据来源：演示数据（非真实订单）</div>
+
+<script>/* =========================================================================
+   deck.js · McWrapped 动效引擎（零依赖，原生 JS）
+   不认识任何业务概念，只通过 DOM 的 data-* 契约工作。
+
+   核心行为：**逐步演出（staged reveal）+ 点击加速**
+   - 进入一屏后，把带 data-anim 的元素按 data-beat 顺序一段段播放；
+   - 播放中「点击/滚轮/方向键/触摸」= 加速：立即显示本屏剩余内容；
+   - 全部显示完后再触发 = 翻到下一屏。
+
+   其余职责：数字滚动、图表描边/生长、转场、粒子、主题、省电模式、重播。
+   ========================================================================= */
+(function () {
+  "use strict";
+
+  var mqReduce = window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  var reduce = mqReduce ? mqReduce.matches : false;
+
+  /* ------------------------------------------------------------ DOM */
+  var stage = document.getElementById("stage");
+  var track = document.getElementById("track");
+  if (!stage || !track) return;
+  var scenes = Array.prototype.slice.call(track.querySelectorAll(".scene"));
+  var rail = document.getElementById("rail");
+  var bar = document.getElementById("progressBar");
+  var chapter = document.getElementById("chapterLabel");
+  var hint = document.getElementById("hint");
+  var cue = document.getElementById("advanceCue");
+  var total = scenes.length;
+  if (!total) return;
+
+  var visited = new Array(total);
+  var index = 0;
+  var motionOn = !reduce;
+  var hintTimer = null;
+
+  /* 逐步演出的状态机 */
+  var beats = [];        /* 本屏所有节拍（元素数组的数组） */
+  var beatAt = 0;        /* 已播到第几拍 */
+  var beatTimer = null;  /* 下一拍的定时器 */
+  var playing = false;   /* 是否正在逐步播放 */
+
+  var BEAT_GAP = 460;    /* 拍与拍之间间隔（ms），营造"一点一点" */
+  var FIRST_GAP = 260;   /* 进屏到第一拍的延迟 */
+
+  var THEMES = {"dark":{"bg":"#0A0A0A","bg-2":"#141414","panel":"#171717","panel-2":"#1F1F1F","text":"#F5F1EA","muted":"#A8A29A","faint":"#6B655D","accent":"#E60012","accent-2":"#FF2A2A","accent-ink":"#0A0A0A","brand":"#E60012","gold":"#FFB300","grid":"rgba(230,0,18,.10)","border":"rgba(245,241,234,.14)","slash":"#E60012","slash-2":"#1F1F1F","tape":"rgba(245,241,234,.06)","glow":"rgba(230,0,18,.30)","particle":"#E60012","grain-op":".05"},"light":{"bg":"#F2EDE4","bg-2":"#E8E1D5","panel":"#FFFFFF","panel-2":"#F7F3EC","text":"#141414","muted":"#5C564E","faint":"#8C857B","accent":"#D6000F","accent-2":"#E60012","accent-ink":"#FFFFFF","brand":"#D6000F","gold":"#C98A00","grid":"rgba(20,20,20,.07)","border":"rgba(20,20,20,.16)","slash":"#141414","slash-2":"#D6000F","tape":"rgba(20,20,20,.05)","glow":"rgba(214,0,15,.20)","particle":"#D6000F","grain-op":".08"}};
+  var DEFAULT_THEME = "dark";
+
+  /* ============================================================ 主题 */
+  function applyTheme(name) {
+    var t = THEMES[name] || THEMES[DEFAULT_THEME];
+    var r = document.documentElement;
+    for (var k in t) {
+      if (Object.prototype.hasOwnProperty.call(t, k)) {
+        r.style.setProperty("--" + k, t[k]);
+      }
+    }
+    r.setAttribute("data-theme", name);
+    try { localStorage.setItem("mcdwrapped.theme", name); } catch (e) {}
+  }
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute("data-theme") || DEFAULT_THEME;
+    applyTheme(cur === "dark" ? "light" : "dark");
+  }
+
+  /* ============================================================ 粒子 */
+  function seedParticles(scene) {
+    if (!motionOn || scene.dataset.seeded) return;
+    scene.dataset.seeded = "1";
+    var host = scene.querySelector(".aura");
+    if (!host) return;
+    var n = parseInt(scene.dataset.particles || "0", 10);
+    if (!n) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < n; i++) {
+      var p = document.createElement("span");
+      p.className = "particle";
+      var size = 2 + Math.random() * 7;
+      p.style.width = size + "px";
+      p.style.height = size + "px";
+      p.style.left = (Math.random() * 100) + "%";
+      p.style.bottom = (-10 - Math.random() * 20) + "%";
+      p.style.setProperty("--p-op", (0.16 + Math.random() * 0.42).toFixed(2));
+      p.style.animationDuration = (11 + Math.random() * 16).toFixed(1) + "s";
+      p.style.animationDelay = (-Math.random() * 20).toFixed(1) + "s";
+      frag.appendChild(p);
+    }
+    host.appendChild(frag);
+  }
+
+  /* ============================================================ 数字滚动 */
+  function countUp(el) {
+    var target = parseFloat(el.getAttribute("data-count"));
+    var prefix = el.getAttribute("data-prefix") || "";
+    var suffix = el.getAttribute("data-suffix") || "";
+    var dec = parseInt(el.getAttribute("data-decimals") || "0", 10);
+    var group = el.getAttribute("data-group") !== "0";
+
+    function render(v) {
+      var s = dec > 0 ? v.toFixed(dec) : String(Math.round(v));
+      if (group && dec === 0) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      el.textContent = prefix + s + suffix;
+    }
+    if (isNaN(target)) { render(0); return; }
+    if (!motionOn) { render(target); return; }
+
+    var dur = parseInt(el.getAttribute("data-count-dur") || "1250", 10);
+    var t0 = null;
+    el.textContent = prefix + (dec > 0 ? (0).toFixed(dec) : "0") + suffix;
+    /* 保险：动画若因标签被节流而没跑完，2 秒后强制落到真值，
+       避免用户长时间盯着一个 0。 */
+    var guard = window.setTimeout(function () { render(target); }, dur + 900);
+    function tick(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min(1, (ts - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 4);
+      render(target * eased);
+      if (p < 1) requestAnimationFrame(tick);
+      else { window.clearTimeout(guard); render(target); }
+    }
+    requestAnimationFrame(tick);
+  }
+  function countUpInstant(el) {
+    if (motionOn) return;           /* 动效开启时留给动画 */
+    el.textContent = (el.getAttribute("data-prefix") || "") +
+      el.getAttribute("data-count") + (el.getAttribute("data-suffix") || "");
+  }
+
+  /* ============================================================ 图表准备 */
+  function primePath(path) {
+    try {
+      var len = path.getTotalLength();
+      if (len && isFinite(len)) {
+        path.style.setProperty("--len", len);
+        path.style.strokeDasharray = len;
+        path.style.strokeDashoffset = len;
+      }
+    } catch (e) {}
+  }
+  function primeDonut(svg) {
+    var segs = svg.querySelectorAll(".donut-seg");
+    var sum = 0;
+    Array.prototype.forEach.call(segs, function (s) {
+      sum += parseFloat(s.getAttribute("data-len") || "0");
+    });
+    Array.prototype.forEach.call(segs, function (s) {
+      var len = parseFloat(s.getAttribute("data-len") || "0");
+      var circ = parseFloat(s.getAttribute("data-circ") || "0") || sum;
+      s.style.setProperty("--circ", circ);
+      s.style.setProperty("--offset", circ - len);
+    });
+  }
+  function prepare(scene) {
+    Array.prototype.forEach.call(
+      scene.querySelectorAll('[data-anim="draw"]'), primePath);
+    Array.prototype.forEach.call(
+      scene.querySelectorAll("svg[data-donut]"), primeDonut);
+  }
+
+  /* ============================================================ 逐步演出 */
+
+  /* 把一屏的元素按 data-beat 分组。没有 data-beat 的，按 data-anim-delay
+     排序后每 2 个一组合并成一拍（兼容旧场景）。 */
+  function buildBeats(scene) {
+    var els = Array.prototype.slice.call(scene.querySelectorAll("[data-anim]"));
+    var groups = {};
+    var hasBeat = false;
+    els.forEach(function (el) {
+      var raw = el.getAttribute("data-beat");
+      if (raw !== null) hasBeat = true;
+    });
+    if (hasBeat) {
+      els.forEach(function (el) {
+        var b = parseInt(el.getAttribute("data-beat") || "0", 10);
+        (groups[b] = groups[b] || []).push(el);
+      });
+    } else {
+      els.map(function (el, i) { return { el: el, i: i }; })
+        .sort(function (a, b) {
+          return (parseInt(a.el.getAttribute("data-anim-delay") || "0", 10) || a.i * 60)
+            - (parseInt(b.el.getAttribute("data-anim-delay") || "0", 10) || b.i * 60);
+        })
+        .forEach(function (o, k) {
+          var b = Math.floor(k / 2);
+          (groups[b] = groups[b] || []).push(o.el);
+        });
+    }
+    return Object.keys(groups)
+      .map(function (k) { return parseInt(k, 10); })
+      .sort(function (a, b) { return a - b; })
+      .map(function (k) { return groups[k]; });
+  }
+
+  /* 播放一拍（数组里的元素同时入场） */
+  function playBeat(list) {
+    list.forEach(function (el) {
+      el.classList.add("anim-in");
+      var d = el.getAttribute("data-anim-delay");
+      if (d) el.style.setProperty("--delay", d + "ms");
+    });
+    /* 这一拍里的数字与图表跟着启动 */
+    list.forEach(function (el) {
+      if (el.hasAttribute("data-count")) countUp(el);
+      if (el.getAttribute("data-anim") === "draw") primePath(el);
+      Array.prototype.forEach.call(
+        el.querySelectorAll ? el.querySelectorAll("[data-count]") : [], countUp);
+    });
+    watchdog(list);
+  }
+
+  /* 看门狗：动画理应结束后若仍不可见（后台标签节流 / 动画被禁用 /
+     浏览器卡顿导致 fill-mode 停在 0），强制补一次"硬显示"，
+     保证内容永远不会白屏。 */
+  function watchdog(list) {
+    var ms = 1400;
+    window.setTimeout(function () {
+      list.forEach(function (el) {
+        var op = parseFloat(window.getComputedStyle(el).opacity);
+        if (!isNaN(op) && op < 0.02) {
+          el.classList.add("anim-done");
+        }
+      });
+    }, ms);
+  }
+
+  /* 一次性把本屏全部显示（跳过/加速/reduced-motion） */
+  function revealAll(scene) {
+    stopBeats();
+    scene.classList.add("anim");
+    Array.prototype.forEach.call(scene.querySelectorAll("[data-anim]"), function (el) {
+      el.classList.add("anim-in");
+    });
+    Array.prototype.forEach.call(scene.querySelectorAll("[data-count]"), function (el) {
+      if (motionOn) countUp(el);
+      else {
+        el.textContent = (el.getAttribute("data-prefix") || "") +
+          el.getAttribute("data-count") + (el.getAttribute("data-suffix") || "");
+      }
+    });
+    Array.prototype.forEach.call(scene.querySelectorAll(".donut-seg"), function (s) {
+      s.style.strokeDashoffset = 0;
+    });
+    Array.prototype.forEach.call(
+      scene.querySelectorAll('[data-anim="draw"]'), function (p) {
+        p.style.strokeDashoffset = 0;
+      });
+  }
+
+  function stopBeats() {
+    if (beatTimer) { window.clearTimeout(beatTimer); beatTimer = null; }
+    playing = false;
+    if (cue) cue.classList.remove("show");
+  }
+
+  /* 启动本屏的逐步演出 */
+  function startBeats(scene, delay) {
+    stopBeats();
+    prepare(scene);
+    beats = buildBeats(scene);
+    beatAt = 0;
+
+    if (!motionOn || !beats.length) {
+      revealAll(scene);
+      return;
+    }
+
+    scene.classList.add("anim");
+    playing = true;
+    if (cue) cue.classList.add("show");
+
+    function nextBeat() {
+      if (beatAt >= beats.length) { finishBeats(); return; }
+      playBeat(beats[beatAt]);
+      beatAt += 1;
+      beatTimer = window.setTimeout(nextBeat, BEAT_GAP);
+    }
+    beatTimer = window.setTimeout(nextBeat, delay == null ? FIRST_GAP : delay);
+  }
+
+  function finishBeats() {
+    if (beatTimer) { window.clearTimeout(beatTimer); beatTimer = null; }
+    playing = false;
+    if (cue) cue.classList.remove("show");
+  }
+
+  /* 用户想「加速」：还有剩余节拍就全放出来；否则返回 false（可以翻页） */
+  function accelerate() {
+    var scene = scenes[index];
+    if (!playing) return false;
+    revealAll(scene);
+    return true;
+  }
+
+  /* ============================================================ 转场 */
+  function layout() {
+    scenes.forEach(function (s, i) {
+      s.style.transform = "translate3d(0," + (i * 100) + "%,0)";
+    });
+  }
+
+  function goto(n, opts) {
+    opts = opts || {};
+    n = Math.max(0, Math.min(total - 1, n));
+    if (n === index && !opts.force) return;
+
+    stopBeats();
+    index = n;
+    track.style.transform = "translate3d(0," + (-index * 100) + "%,0)";
+    paint();
+
+    var scene = scenes[index];
+    seedParticles(scene);
+    if (!visited[index] || opts.replay) {
+      visited[index] = true;
+      /* 等位移开始后再播，观感上是「滑入即生长」 */
+      var delay = motionOn ? (opts.replay ? 60 : 300) : 0;
+      if (opts.replay) { resetAnimations(scene); }
+      window.setTimeout(function () { startBeats(scene, FIRST_GAP); }, delay);
+    }
+  }
+
+  function paint() {
+    var i = index;
+    scenes.forEach(function (s, k) {
+      var on = (k === i);
+      s.classList.toggle("active", on);
+      s.setAttribute("aria-hidden", on ? "false" : "true");
+    });
+    if (bar) bar.style.width = ((i + 1) / total * 100) + "%";
+    if (chapter && scenes[i].dataset.chapterName) {
+      chapter.textContent = scenes[i].dataset.chapterName;
+    }
+    if (rail) {
+      Array.prototype.forEach.call(rail.children, function (b, k) {
+        b.classList.toggle("on", k === i);
+        b.setAttribute("aria-current", k === i ? "true" : "false");
+      });
+    }
+    if (hint) hint.classList.toggle("hide", i > 0);
+  }
+
+  /* 统一的「前进」：正在演出则加速，否则翻页 */
+  function advance(dir) {
+    dir = dir || 1;
+    if (accelerate()) return;
+    goto(index + dir);
+  }
+
+  function resetAnimations(scene) {
+    scene.classList.remove("anim");
+    Array.prototype.forEach.call(scene.querySelectorAll("[data-anim]"), function (el) {
+      el.classList.remove("anim-in");
+    });
+    Array.prototype.forEach.call(
+      scene.querySelectorAll('[data-anim="draw"]'), function (el) {
+        var len = parseInt(el.getAttribute("--len") || 0, 10);
+        if (!len) { try { len = el.getTotalLength(); } catch (e) { len = 0; } }
+        if (len) el.style.strokeDashoffset = len;
+      });
+    Array.prototype.forEach.call(scene.querySelectorAll("[data-count]"), function (el) {
+      el.textContent = (el.getAttribute("data-prefix") || "") + "0" +
+        (el.getAttribute("data-suffix") || "");
+    });
+    Array.prototype.forEach.call(scene.querySelectorAll(".donut-seg"), function (s) {
+      s.style.strokeDashoffset = s.style.getPropertyValue("--circ") || "";
+    });
+  }
+
+  /* ============================================================ 输入 */
+  /* 滚轮：累积阈值，避免触控板惯性一次跳多屏 */
+  var wheelAcc = 0, wheelLock = false;
+  stage.addEventListener("wheel", function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest("[data-scrollable]")) return;
+    e.preventDefault();
+    if (wheelLock) return;
+    wheelAcc += e.deltaY;
+    var TH = 46;
+    if (wheelAcc > TH) {
+      wheelAcc = 0; wheelLock = true; advance(1);
+    } else if (wheelAcc < -TH) {
+      wheelAcc = 0; wheelLock = true; advance(-1);
+    }
+    window.setTimeout(function () { wheelLock = false; }, 620);
+  }, { passive: false });
+
+  /* 点击空白处 = 加速 / 翻页 */
+  stage.addEventListener("click", function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest("button,a,[data-scrollable]")) return;
+    advance(1);
+  });
+
+  /* 键盘 */
+  document.addEventListener("keydown", function (e) {
+    var k = e.key;
+    if (k === "ArrowDown" || k === "PageDown" || k === " ") {
+      e.preventDefault(); advance(1);
+    } else if (k === "ArrowUp" || k === "PageUp") {
+      e.preventDefault(); advance(-1);
+    } else if (k === "Home") { e.preventDefault(); goto(0); }
+    else if (k === "End") { e.preventDefault(); goto(total - 1); }
+    else if (k === "r" || k === "R") { replay(); }
+  });
+
+  /* 触摸滑动 */
+  var ts = null;
+  stage.addEventListener("touchstart", function (e) {
+    if (e.touches.length !== 1) return;
+    ts = { y: e.touches[0].clientY, x: e.touches[0].clientX };
+  }, { passive: true });
+  stage.addEventListener("touchend", function (e) {
+    if (!ts) return;
+    var t = e.changedTouches[0];
+    var dy = ts.y - t.clientY;
+    var dx = ts.x - t.clientX;
+    /* 纵向意图明显才翻屏，横向留给浏览器 */
+    if (Math.abs(dy) > 48 && Math.abs(dy) > Math.abs(dx) * 1.3) {
+      advance(dy > 0 ? 1 : -1);
+    } else if (Math.abs(dy) < 12 && Math.abs(dx) < 12) {
+      advance(1);            /* 轻点 = 加速 */
+    }
+    ts = null;
+  }, { passive: true });
+
+  /* ============================================================ 控制 */
+  function replay() {
+    var scene = scenes[index];
+    resetAnimations(scene);
+    window.setTimeout(function () { startBeats(scene, 40); }, 40);
+  }
+  function toggleMotion() {
+    motionOn = !motionOn;
+    document.documentElement.classList.toggle("motion-off", !motionOn);
+    var bm = document.getElementById("btnMotion");
+    if (bm) bm.classList.toggle("off", !motionOn);
+    if (motionOn) { replay(); }
+    else { revealAll(scenes[index]); }
+    try { localStorage.setItem("mcdwrapped.motion", motionOn ? "1" : "0"); } catch (e) {}
+  }
+
+  /* ============================================================ 绑定 */
+  ["btnTheme", "btnThemeTop"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("click", toggleTheme);
+  });
+  ["btnReplay", "btnReplayEnd"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("click", replay);
+  });
+  var bm = document.getElementById("btnMotion");
+  if (bm) bm.addEventListener("click", toggleMotion);
+  var bt = document.getElementById("btnPrint");
+  if (bt) bt.addEventListener("click", function () { window.print(); });
+
+  /* 开始按钮 */
+  var sb = document.getElementById("startBtn");
+  if (sb) sb.addEventListener("click", function (e) {
+    e.stopPropagation();
+    goto(index + 1);
+  });
+
+  /* 标签回到前台：若本屏仍在"逐步"中，补一次硬显示，避免后台节流
+     把动画冻在 opacity:0 的中间态。 */
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && playing) {
+      var s = scenes[index];
+      Array.prototype.forEach.call(
+        s.querySelectorAll("[data-anim].anim-in"), function (el) {
+          var op = parseFloat(window.getComputedStyle(el).opacity);
+          if (!isNaN(op) && op < 0.02) el.classList.add("anim-done");
+        });
+    }
+  });
+
+  /* 侧边导轨 */
+  if (rail) {
+    scenes.forEach(function (s, i) {
+      var b = document.createElement("button");
+      b.className = "rail-btn";
+      b.type = "button";
+      b.setAttribute("aria-label",
+        "第 " + (i + 1) + " 屏：" + (s.dataset.chapterName || ""));
+      b.addEventListener("click", function () { goto(i); });
+      rail.appendChild(b);
+    });
+  }
+
+  if (mqReduce && mqReduce.addEventListener) {
+    mqReduce.addEventListener("change", function (e) {
+      if (e.matches) { motionOn = false;
+        document.documentElement.classList.add("motion-off");
+        var b2 = document.getElementById("btnMotion");
+        if (b2) b2.classList.add("off");
+        revealAll(scenes[index]);
+      }
+    });
+  }
+
+  /* ============================================================ 启动 */
+  try {
+    var savedTheme = localStorage.getItem("mcdwrapped.theme");
+    if (savedTheme && THEMES[savedTheme]) applyTheme(savedTheme);
+    var savedMotion = localStorage.getItem("mcdwrapped.motion");
+    if (savedMotion === "0") motionOn = false;
+    else if (savedMotion === "1") motionOn = true;
+  } catch (e) {}
+  if (!motionOn) {
+    document.documentElement.classList.add("motion-off");
+    var bmEl = document.getElementById("btnMotion");
+    if (bmEl) bmEl.classList.add("off");
+  }
+
+  layout();
+  paint();
+  seedParticles(scenes[0]);
+  visited[0] = true;
+  window.setTimeout(function () { startBeats(scenes[0], motionOn ? 420 : 0); }, 60);
+
+  hintTimer = window.setTimeout(function () {
+    if (hint) hint.classList.add("hide");
+  }, 6000);
+
+  /* 对外 API（便于自动化与人机调试） */
+  window.McWrapped = {
+    goto: goto,
+    next: function () { advance(1); },
+    prev: function () { advance(-1); },
+    replay: replay,
+    reset: function () { goto(0); },
+    revealAll: function () { revealAll(scenes[index]); },
+    isPlaying: function () { return playing; },
+    beat: function () { return { at: beatAt, of: beats.length }; }
+  };
+})();
+</script>
+</body>
+</html>

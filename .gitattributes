@@ -1,0 +1,7 @@
+# 统一按 LF 存储，避免 Windows 下 CRLF 造成的 diff 噪声
+* text=auto eol=lf
+
+# 二进制/生成物不参与 diff
+*.png binary
+*.jpg binary
+*.html linguist-generated=true
