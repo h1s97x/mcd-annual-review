@@ -1,4 +1,4 @@
-# 麦门年度账本 / McWrapped · mcd-annual-review
+# 麦门年度账本 McWrapped · 个人年度报告 / Annual Review
 
 ![MCP](https://img.shields.io/badge/MCP-McDonald's%20China-FFC72C?logo=mcDonalds)
 
