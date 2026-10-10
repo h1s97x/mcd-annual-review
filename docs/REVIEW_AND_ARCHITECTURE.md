@@ -1,6 +1,6 @@
 # 代码与架构审查 + 参赛合规核查
 
-> 审查对象：`mcd-order-report`（2026 麦当劳程序员创意开发大赛参赛作品）
+> 审查对象：`mcd-annual-review`（2026 麦当劳程序员创意开发大赛参赛作品）
 > 审查日期：2026-10-10
 > 依据：官方 `M-China/mcd-developer-innovation-challenge` 的 README / activityGuidelines，以及本仓库全部源码。
 
@@ -19,7 +19,7 @@
 ## 1. 现状盘点（事实）
 
 ```
-mcd-order-report/
+mcd-annual-review/
 ├── SKILL.md                 # Skill 定义
 ├── README.md
 ├── SUBMISSION.md            # Issue 提交指引
@@ -90,7 +90,7 @@ mcd-order-report/
 ### 4.1 分层与目录
 
 ```
-mcd-order-report/
+mcd-annual-review/
 ├── SKILL.md
 ├── README.md                    # 含"目标用户"章节
 ├── CONTEST_DECLARATION.md       # ← 官方原样，放根目录

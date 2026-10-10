@@ -1,4 +1,4 @@
-# 麦门年度账本 / McWrapped · mcd-order-report
+# 麦门年度账本 / McWrapped · mcd-annual-review
 
 ![MCP](https://img.shields.io/badge/MCP-McDonald's%20China-FFC72C?logo=mcDonalds)
 
@@ -116,7 +116,7 @@ python scripts/generate_report.py --only cover,overview,outro # 只出骨架三�
 ## 目录结构
 
 ```
-mcd-order-report/
+mcd-annual-review/
 ├── SKILL.md                    # Skill 定义（WorkBuddy 加载）
 ├── README.md                   # 本文件
 ├── CONTEST_DECLARATION.md      # 参赛声明（官方原文，勿改）

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""mcd-order-report：麦门年度报告生成器。
+"""mcd-annual-review：麦门年度报告生成器。
 
 分层结构（依赖方向单向向下，domain 不依赖 render）：
 

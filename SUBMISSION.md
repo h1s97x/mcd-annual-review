@@ -41,8 +41,8 @@
 正文（已提交为 Issue #379）：
 ```
 【参赛申请】
-项目名称：麦门年度账本 McWrapped（mcd-order-report）
-项目地址：https://github.com/h1s97x/mcd-order-report
+项目名称：麦门年度账本 McWrapped（mcd-annual-review）
+项目地址：https://github.com/h1s97x/mcd-annual-review
 项目简介：把你在麦当劳一年的订单做成一份能一屏一屏看下去的年度报告，11 幕从封面一路推到「消费人格」。视觉走《女神异闻录 5 皇家版》的波普朋克海报风——幻影红 + 墨黑的斜切色块、涂鸦动感线条、「绑架信」式拼贴大字；每屏都是「大字结论 + 小字注解 + 数据层」三层，11 屏版式互不重复，不平铺直叙。演出上做成「逐步呈现 + 点击加速」：内容按 data-beat 分段自动入场（间隔 460ms）一点点铺开，播放中点击 / 滚轮 / 方向键会立刻展开剩余内容，再触发一次才翻页，同时解决「太快看不清」和「想跳过要干等」。数据来自麦当劳 MCP 真实订单（order-list / list-nutrition-foods / campaign-calendar / query-my-coupons），Python 标准库分层实现，动效为原生 JS/CSS 零第三方库，产物是单文件 HTML、图表内联 SVG、无任何外链，双击即可离线打开；计数器的 HTML 直接写真值，禁用 JS 或打印时依然正确，48 项单元测试通过。使用 WorkBuddy 开发，已提交 workbuddy.md。
 ```
 

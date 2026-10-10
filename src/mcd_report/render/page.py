@@ -25,7 +25,7 @@ _TPL = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="color-scheme" content="dark light"/>
 <meta name="description" content="麦门年度账本 · McWrapped —— 基于麦当劳 MCP 历史订单的个人年度报告"/>
-<meta name="generator" content="mcd-order-report · %(engine)s v%(schema)s"/>
+<meta name="generator" content="mcd-annual-review · %(engine)s v%(schema)s"/>
 <title>麦门年度账本 · McWrapped</title>
 <style>%(css)s</style>
 <script>document.documentElement.className+=" deck-ready";</script>

@@ -1,5 +1,5 @@
 ---
-name: mcd-order-report
+name: mcd-annual-review
 description: "基于麦当劳 MCP 历史订单，生成单文件、全屏章节化的个人点餐「年度报告」（McWrapped 风格）：11 屏滚动叙事 + 数字滚动计数 + 图表生长描边动效 + 双主题，零外部依赖，可直接在 WorkBuddy 中调用 mcd-mcp 拉数并产出报告。"
 version: "2.0.0"
 ---

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-麦当劳 MCP 数据拉取脚本（mcd-order-report Skill 的数据源）。
+麦当劳 MCP 数据拉取脚本（mcd-annual-review Skill 的数据源）。
 
 拉取 order-list / query-my-coupons / campaign-calendar / list-nutrition-foods，
 归一化为 orders.json 供 generate_report.py 使用。
@@ -71,7 +71,7 @@ def _parse(raw):
 def initialize():
     _post({"jsonrpc": "2.0", "id": 1, "method": "initialize",
            "params": {"protocolVersion": "2024-11-05", "capabilities": {},
-                      "clientInfo": {"name": "mcd-order-report", "version": "1.0.0"}}})
+                      "clientInfo": {"name": "mcd-annual-review", "version": "1.0.0"}}})
     _post({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
 
